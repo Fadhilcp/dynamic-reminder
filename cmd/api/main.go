@@ -37,6 +37,7 @@ func main() {
 	{
 		rules.POST("", ruleHandler.CreateRule)
 		rules.GET("", ruleHandler.GetRules)
+		router.GET("/logs", ruleHandler.GetLogs)
 		rules.PUT("/:ruleId", ruleHandler.UpdateRule)
 		rules.PATCH("/:ruleId/toggle", ruleHandler.ToggleRule)
 		rules.DELETE("/:ruleId", ruleHandler.DeleteRule)

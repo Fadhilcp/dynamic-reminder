@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"errors"
 	"dynamic-reminder/internal/models"
 )
 
@@ -60,9 +61,18 @@ func (r *RuleRepository) GetRules() ([]models.ReminderRule, error) {
 
 func (r *RuleRepository) UpdateRule(id int, rule *models.ReminderRule) error {
 	query := `UPDATE reminder_rules SET name = ?, condition_type = ?, condition_value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := r.DB.Exec(query, rule.Name, rule.ConditionType, rule.ConditionValue, id)
+	
+	res, err := r.DB.Exec(query, rule.Name, rule.ConditionType, rule.ConditionValue, id)
 	if err != nil {
 		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errors.New("rule not found")
 	}
 
 	details := fmt.Sprintf("Updated rule ID %d: Name='%s', Type='%s', Value='%s'", id, rule.Name, rule.ConditionType, rule.ConditionValue)
@@ -82,11 +92,45 @@ func (r *RuleRepository) ToggleRuleStatus(id int, isActive bool) error {
 
 func (r *RuleRepository) DeleteRule(id int) error {
 	query := `DELETE FROM reminder_rules WHERE id = ?`
-	_, err := r.DB.Exec(query, id)
+	res, err := r.DB.Exec(query, id)
 	if err != nil {
 		return err
 	}
 
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("rule not found")
+	}
+
 	details := fmt.Sprintf("Deleted rule ID %d", id)
 	return r.LogAudit("rule_deleted", "rule", id, details)
+}
+
+func (r *RuleRepository) GetAuditLogs() ([]models.AuditLog, error) {
+	query := `SELECT id, action_type, entity_type, entity_id, details, created_at FROM audit_logs ORDER BY created_at DESC`
+	
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var log models.AuditLog
+		if err := rows.Scan(&log.ID, &log.ActionType, &log.EntityType, &log.EntityID, &log.Details, &log.CreatedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, log)
+	}
+	
+	if logs == nil {
+		logs = []models.AuditLog{}
+	}
+	
+	return logs, nil
 }

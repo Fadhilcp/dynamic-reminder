@@ -56,6 +56,11 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 	}
 
 	if err := h.Repo.UpdateRule(id, &rule); err != nil {
+		if err.Error() == "rule not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Rule with that ID does not exist"})
+			return
+		}
+		
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update rule"})
 		return
 	}
@@ -87,16 +92,31 @@ func (h *RuleHandler) ToggleRule(c *gin.Context) {
 }
 
 func (h *RuleHandler) DeleteRule(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.Atoi(c.Param("ruleId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rule ID"})
 		return
 	}
 
 	if err := h.Repo.DeleteRule(id); err != nil {
+		if err.Error() == "rule not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Rule with that ID does not exist"})
+			return
+		}
+		
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete rule"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Rule deleted successfully"})
+}
+
+func (h *RuleHandler) GetLogs(c *gin.Context) {
+	logs, err := h.Repo.GetAuditLogs()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch audit logs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, logs)
 }
