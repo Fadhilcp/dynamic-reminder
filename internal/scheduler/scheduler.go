@@ -35,6 +35,14 @@ func evaluateRules(db *sql.DB) {
 
 	now := time.Now()
 	for _, task := range tasks {
+
+		
+		if task.LastRemindedAt.Valid {
+			if time.Since(task.LastRemindedAt.Time) < 30*time.Second {
+				continue 
+			}
+		}
+
 		for _, rule := range rules {
 			
 			triggered := false
@@ -44,13 +52,11 @@ func evaluateRules(db *sql.DB) {
 				days, err := strconv.Atoi(rule.ConditionValue)
 				if err == nil {
 					targetDate := now.AddDate(0, 0, days)
-					// If the task due date is roughly around the target date (checking by day)
 					if task.DueDate.Year() == targetDate.Year() && task.DueDate.YearDay() == targetDate.YearDay() {
 						triggered = true
 					}
 				}
 			case "status_overdue":
-				// If the rule is for overdue items and the due date is in the past
 				if task.DueDate.Before(now) {
 					triggered = true
 				}
@@ -64,6 +70,14 @@ func evaluateRules(db *sql.DB) {
 				fmt.Println("--------------------------------------------------")
 				
 				logAudit(db, "reminder_triggered", "task", task.ID, message)
+
+				// to update last reminded at in task 
+				_, err := db.Exec(`UPDATE tasks SET last_reminded_at = CURRENT_TIMESTAMP WHERE id = ?`, task.ID)
+				if err != nil {
+					log.Printf("Failed to update last_reminded_at for task %d: %v", task.ID, err)
+				}
+				// to avoid remind the same task
+				break
 			}
 		}
 	}
@@ -88,7 +102,7 @@ func getActiveRules(db *sql.DB) []models.ReminderRule {
 }
 
 func getPendingTasks(db *sql.DB) []models.Task {
-	rows, err := db.Query(`SELECT id, title, status, due_date FROM tasks WHERE status = 'pending'`)
+	rows, err := db.Query(`SELECT id, title, status, due_date, last_reminded_at FROM tasks WHERE status = 'pending'`)
 	if err != nil {
 		log.Printf("Scheduler error fetching tasks: %v", err)
 		return nil
@@ -98,7 +112,7 @@ func getPendingTasks(db *sql.DB) []models.Task {
 	var tasks []models.Task
 	for rows.Next() {
 		var t models.Task
-		if err := rows.Scan(&t.ID, &t.Title, &t.Status, &t.DueDate); err == nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.Status, &t.DueDate, &t.LastRemindedAt); err == nil {
 			tasks = append(tasks, t)
 		}
 	}

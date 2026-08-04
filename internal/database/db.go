@@ -30,6 +30,7 @@ func createTables(db *sql.DB) {
 		description TEXT,
 		status TEXT NOT NULL,
 		due_date DATETIME NOT NULL,
+		last_reminded_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
